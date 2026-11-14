@@ -119,11 +119,15 @@ export const Confirm = ({ msg, onYes, onNo }: { msg: string; onYes: () => void; 
    ============================================================ */
 
 // Describes one input in the form.
+// One dropdown choice: `value` is what gets saved (e.g. "C-01"), `label` is what the user sees.
+export type Option = { value: string; label: string }
+
+// Describes one input in the form.
 export type Field = {
   k: string // key: the name the value is stored under (e.g. "email")
   l: string // label shown above the input
   t?: string // input type: 'text' (default), 'email', 'number', ...
-  o?: string[] // options: if given, shows a dropdown instead of a text input
+  o?: (string | Option)[] // options: plain strings, or { value, label } pairs. Shows a dropdown instead of a text input
   req?: boolean // required: must not be empty
   min?: number // smallest allowed number (only for type 'number'; default 0)
 }
@@ -187,7 +191,11 @@ export function Form({ fields, init, onSave, onCancel, label = 'Save' }: {
             // Dropdown
             <select className="inp mt-1" value={values[field.k] ?? ''} onChange={(e) => setValue(field.k, e.target.value)}>
               <option value="">Select…</option>
-              {field.o.map((option) => <option key={option}>{option}</option>)}
+              {field.o.map((option) => {
+                // A plain string is both the value and the label; an Option has them separately.
+                const { value, label } = typeof option === 'string' ? { value: option, label: option } : option
+                return <option key={value} value={value}>{label}</option>
+              })}
             </select>
           ) : (
             // Regular input

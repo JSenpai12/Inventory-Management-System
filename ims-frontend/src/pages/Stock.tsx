@@ -21,6 +21,10 @@ const STOCK_OUT_REASONS = ['Sale', 'Damaged', 'Expired', 'Internal use']
 /** Values collected by the stock form. */
 type FormValues = Record<string, string | number>
 
+/** Finds a product by its id and returns its name. Falls back to the id if the product no longer exists. */
+const productNameOf = (products: Product[], productId: string) =>
+  products.find((product) => product.id === productId)?.name ?? productId
+
 /** Tab button styling: brand for Stock In, red for Stock Out, muted when inactive. */
 function tabButtonClass(tab: StockTab, isActive: boolean) {
   if (!isActive) return 'bg-white/5 text-slate-400'
@@ -51,7 +55,13 @@ export default function Stock() {
   const isStockIn = activeTab === 'Stock In'
 
   const formFields: Field[] = [
-    { k: 'product', l: 'Product', o: products.map((product) => product.name), req: true },
+    // The user sees the product name; the form saves the product id.
+    {
+      k: 'productId',
+      l: 'Product',
+      o: products.map((product) => ({ value: product.id, label: product.name })),
+      req: true,
+    },
     {
       k: 'qty',
       l: isStockIn ? 'Quantity received' : 'Quantity released',
@@ -61,14 +71,19 @@ export default function Stock() {
     },
     // Stock In is tied to a supplier; Stock Out to a reason instead.
     isStockIn
-      ? { k: 'supplier', l: 'Supplier', o: suppliers.map((supplier) => String(supplier.name)), req: true }
+      ? {
+          k: 'supplierId',
+          l: 'Supplier',
+          o: suppliers.map((supplier) => ({ value: supplier.id, label: String(supplier.name) })),
+          req: true,
+        }
       : { k: 'reason', l: 'Transaction reason', o: STOCK_OUT_REASONS, req: true },
     { k: 'ref', l: 'Reference number', req: true },
     { k: 'remarks', l: 'Remarks' },
   ]
 
   const handleSubmit = async (formValues: FormValues) => {
-    const selectedProduct = products.find((product) => product.name === formValues.product)!
+    const selectedProduct = products.find((product) => product.id === formValues.productId)!
 
     // Never let a release take stock below zero.
     if (!isStockIn && +formValues.qty > selectedProduct.qty) {
@@ -77,12 +92,13 @@ export default function Stock() {
 
     await addTxn({
       id: createId('T'),
-      product: selectedProduct.name,
+      productId: selectedProduct.id,
       type: activeTab,
       qty: +formValues.qty,
       date: getTodayDate(),
       by: CURRENT_USER.name,
-      remarks: formValues.remarks || formValues.ref,
+      // Form values can be string or number, but Txn.remarks must be a string.
+      remarks: String(formValues.remarks || formValues.ref),
     })
 
     toast(`${activeTab} recorded for ${selectedProduct.name}`)
@@ -127,7 +143,8 @@ export default function Stock() {
             rows={transactions}
             cols={[
               { h: 'Transaction ID', k: 'id' },
-              { h: 'Product', k: 'product' },
+              // Shows the product NAME; clicking the header sorts by product id for now.
+              { h: 'Product', k: 'productId', r: (row) => productNameOf(products, row.productId) },
               { h: 'Type', k: 'type', r: (row) => <Badge s={row.type} /> },
               { h: 'Quantity', k: 'qty', r: (row) => <SignedQuantity row={row} /> },
               { h: 'Date', k: 'date' },

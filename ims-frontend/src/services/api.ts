@@ -77,7 +77,7 @@ export const addTxn = (transaction: Txn) => {
   transactions = [transaction, ...transactions]
 
   products = products.map((product) =>
-    product.name === transaction.product
+    product.id === transaction.productId
       ? { ...product, qty: product.qty + quantityDelta, updated: transaction.date }
       : product,
   )

@@ -8,8 +8,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { listProducts, listTable, removeProduct, saveProduct } from '../services/api'
 import { useLoad } from '../hooks/useLoad'
-import { Badge, Confirm, DataTable, Field, FormModal, Modal, Spinner, useToast } from '../components/ui'
-import { CATEGORIES } from '../data/mock'
+import { Badge, Confirm, DataTable, Field, FormModal, Modal, Option, Spinner, useToast } from '../components/ui'
 import { Product, Row, stockStatus } from '../types'
 import { formatMoney, getTodayDate } from '../utils/format'
 import { createId } from '../utils/ids'
@@ -22,12 +21,19 @@ const STATUS_OPTIONS = ['In Stock', 'Low Stock', 'Out of Stock']
 /** Values collected by the add/edit form. */
 type FormValues = Record<string, string | number>
 
+/** Finds a row by its id and returns its name. Falls back to the id if the row no longer exists. */
+const nameOf = (rows: Row[], id: string) => String(rows.find((row) => row.id === id)?.name ?? id)
+
+/** Turns rows into dropdown choices: the id is saved, the name is shown. */
+const toOptions = (rows: Row[]): Option[] => rows.map((row) => ({ value: row.id, label: String(row.name) }))
+
 export default function Inventory({ initialQuery = '' }: { initialQuery?: string }) {
   const [products, isLoading, reloadProducts] = useLoad<Product[]>(listProducts, [])
+  const [categories] = useLoad<Row[]>(() => listTable('categories'), [])
   const [suppliers] = useLoad<Row[]>(() => listTable('suppliers'), [])
 
   const [searchText, setSearchText] = useState(initialQuery)
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('') // holds a category ID, or '' for all
   const [statusFilter, setStatusFilter] = useState('')
   const [activeModal, setActiveModal] = useState<ModalState>(null)
 
@@ -36,8 +42,8 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
   const formFields: Field[] = [
     { k: 'name', l: 'Product name', req: true },
     { k: 'sku', l: 'SKU / barcode', req: true },
-    { k: 'category', l: 'Category', o: CATEGORIES, req: true },
-    { k: 'supplier', l: 'Supplier', o: suppliers.map((supplier) => String(supplier.name)) },
+    { k: 'categoryId', l: 'Category', o: toOptions(categories), req: true },
+    { k: 'supplierId', l: 'Supplier', o: toOptions(suppliers) },
     { k: 'price', l: 'Unit price ($)', t: 'number', req: true },
     { k: 'cost', l: 'Cost price ($)', t: 'number', req: true },
     { k: 'qty', l: 'Current quantity', t: 'number', req: true },
@@ -46,13 +52,21 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
 
   // Apply the search box and both dropdown filters.
   const visibleProducts = products.filter((product) => {
-    const matchesCategory = !categoryFilter || product.category === categoryFilter
+    const matchesCategory = !categoryFilter || product.categoryId === categoryFilter
     const matchesStatus = !statusFilter || stockStatus(product) === statusFilter
     const searchTarget = (product.name + product.sku + product.id).toLowerCase()
     const matchesSearch = searchTarget.includes(searchText.toLowerCase())
 
     return matchesCategory && matchesStatus && matchesSearch
   })
+
+  /** Rows for the "View" popup. Shows category and supplier NAMES instead of their ids. */
+  const detailsFor = (product: Product): [string, string][] =>
+    Object.entries(product).map(([key, value]) => {
+      if (key === 'categoryId') return ['category', nameOf(categories, String(value))]
+      if (key === 'supplierId') return ['supplier', nameOf(suppliers, String(value))]
+      return [key, String(value)]
+    })
 
   const closeModal = () => setActiveModal(null)
 
@@ -64,18 +78,22 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
   const handleSave = async (formValues: FormValues) => {
     const isNewProduct = activeModal?.kind === 'add'
 
-    await saveProduct({
-      // Existing values first, so a new product starts from nothing.
-      ...activeModal?.product,
-      ...formValues,
+    // Build the product field by field. Form inputs come back as strings or numbers,
+    // so each value is converted on purpose to the type Product expects.
+    const product: Product = {
       id: activeModal?.product?.id ?? createId('P'),
-      // Form inputs come back as strings; the store expects numbers.
-      qty: +formValues.qty,
-      price: +formValues.price,
-      cost: +formValues.cost,
-      min: +formValues.min,
+      name: String(formValues.name),
+      categoryId: String(formValues.categoryId),
+      sku: String(formValues.sku),
+      qty: Number(formValues.qty),
+      min: Number(formValues.min),
+      price: Number(formValues.price),
+      cost: Number(formValues.cost),
+      supplierId: String(formValues.supplierId ?? ''), // supplier is optional in the form
       updated: getTodayDate(),
-    })
+    }
+
+    await saveProduct(product)
 
     toast(isNewProduct ? 'Product added' : 'Product updated')
     closeModal()
@@ -105,8 +123,10 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
           onChange={(event) => setCategoryFilter(event.target.value)}
         >
           <option value="">All categories</option>
-          {CATEGORIES.map((category) => (
-            <option key={category}>{category}</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
           ))}
         </select>
 
@@ -138,7 +158,8 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
           cols={[
             { h: 'Product ID', k: 'id' },
             { h: 'Product name', k: 'name' },
-            { h: 'Category', k: 'category' },
+            // Shows the category NAME; clicking the header sorts by category id for now.
+            { h: 'Category', k: 'categoryId', r: (product) => nameOf(categories, product.categoryId) },
             { h: 'SKU', k: 'sku' },
             { h: 'Qty', k: 'qty' },
             { h: 'Unit price', k: 'price', r: (product) => formatMoney(product.price) },
@@ -163,10 +184,10 @@ export default function Inventory({ initialQuery = '' }: { initialQuery?: string
       {activeModal?.kind === 'view' && activeModal.product && (
         <Modal title={activeModal.product.name} onClose={closeModal}>
           <dl className="space-y-2 text-sm">
-            {Object.entries(activeModal.product).map(([label, value]) => (
+            {detailsFor(activeModal.product).map(([label, value]) => (
               <div key={label} className="flex justify-between gap-4 border-b border-line pb-1">
                 <dt className="text-slate-500">{label}</dt>
-                <dd>{String(value)}</dd>
+                <dd>{value}</dd>
               </div>
             ))}
           </dl>

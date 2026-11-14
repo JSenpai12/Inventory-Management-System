@@ -20,7 +20,7 @@ import {
 import { listProducts, listTable, listTxns } from '../services/api'
 import { useLoad } from '../hooks/useLoad'
 import { Badge, DataTable, Spinner } from '../components/ui'
-import { CATEGORIES, daily } from '../data/mock'
+import { daily } from '../data/mock'
 import { Product, Row, stockStatus, Txn } from '../types'
 import { formatMoney } from '../utils/format'
 
@@ -46,6 +46,10 @@ const WEEKLY_MOVEMENT_PLACEHOLDER = [
   { weekday: 'Sat', stockIn: 55, stockOut: 25 },
   { weekday: 'Sun', stockIn: 20, stockOut: 40 },
 ]
+
+/** Finds a product by its id and returns its name. Falls back to the id if the product no longer exists. */
+const productNameOf = (products: Product[], productId: string) =>
+  products.find((product) => product.id === productId)?.name ?? productId
 
 /* -------------------------------------------------------------------------- */
 /* Stat cards                                                                  */
@@ -115,10 +119,11 @@ function MovementTrendsChart() {
   )
 }
 
-function CategoryPieChart({ products }: { products: Product[] }) {
-  const productsPerCategory = CATEGORIES.map((category) => ({
-    name: category,
-    value: products.filter((product) => product.category === category).length,
+function CategoryPieChart({ products, categories }: { products: Product[]; categories: Row[] }) {
+  // One slice per category: its name and how many products point to it by categoryId.
+  const productsPerCategory = categories.map((category) => ({
+    name: String(category.name),
+    value: products.filter((product) => product.categoryId === category.id).length,
   }))
 
   return (
@@ -128,8 +133,8 @@ function CategoryPieChart({ products }: { products: Product[] }) {
         <ResponsiveContainer width="60%">
           <PieChart>
             <Pie data={productsPerCategory} dataKey="value" innerRadius={45} outerRadius={80} stroke="#111415">
-              {CATEGORIES.map((category, index) => (
-                <Cell key={category} fill={CHART_COLORS[index]} />
+              {categories.map((category, index) => (
+                <Cell key={category.id} fill={CHART_COLORS[index]} />
               ))}
             </Pie>
             <Tooltip {...TOOLTIP_PROPS} />
@@ -137,10 +142,10 @@ function CategoryPieChart({ products }: { products: Product[] }) {
         </ResponsiveContainer>
 
         <ul className="space-y-1 text-xs">
-          {CATEGORIES.map((category, index) => (
-            <li key={category} className="flex items-center gap-2">
+          {categories.map((category, index) => (
+            <li key={category.id} className="flex items-center gap-2">
               <i className="h-2.5 w-2.5 rounded-sm" style={{ background: CHART_COLORS[index] }} />
-              {category}
+              {category.name}
             </li>
           ))}
         </ul>
@@ -191,14 +196,14 @@ function RecentlyAddedProducts({ products }: { products: Product[] }) {
   )
 }
 
-function RecentActivity({ transactions }: { transactions: Txn[] }) {
+function RecentActivity({ transactions, products }: { transactions: Txn[]; products: Product[] }) {
   return (
     <div className="card p-4">
       <h3 className="mb-3 font-medium text-white">Recent activity</h3>
       <ul className="space-y-2 text-sm text-slate-400">
         {transactions.slice(0, 5).map((transaction) => (
           <li key={transaction.id}>
-            {transaction.by} recorded {transaction.type.toLowerCase()} of {transaction.qty} × {transaction.product}
+            {transaction.by} recorded {transaction.type.toLowerCase()} of {transaction.qty} × {productNameOf(products, transaction.productId)}
           </li>
         ))}
       </ul>
@@ -213,9 +218,10 @@ function RecentActivity({ transactions }: { transactions: Txn[] }) {
 export default function Dashboard() {
   const [products, isLoadingProducts] = useLoad<Product[]>(listProducts, [])
   const [transactions, isLoadingTransactions] = useLoad<Txn[]>(listTxns, [])
+  const [categories, isLoadingCategories] = useLoad<Row[]>(() => listTable('categories'), [])
   const [suppliers] = useLoad<Row[]>(() => listTable('suppliers'), [])
 
-  if (isLoadingProducts || isLoadingTransactions) return <Spinner />
+  if (isLoadingProducts || isLoadingTransactions || isLoadingCategories) return <Spinner />
 
   const lowStockProducts = products.filter((product) => stockStatus(product) === 'Low Stock')
   const outOfStockProducts = products.filter((product) => product.qty === 0)
@@ -242,7 +248,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <MovementTrendsChart />
-        <CategoryPieChart products={products} />
+        <CategoryPieChart products={products} categories={categories} />
       </div>
 
       <div className="card">
@@ -252,7 +258,8 @@ export default function Dashboard() {
           rows={transactions}
           cols={[
             { h: 'ID', k: 'id' },
-            { h: 'Product', k: 'product' },
+            // Shows the product NAME; clicking the header sorts by product id for now.
+            { h: 'Product', k: 'productId', r: (transaction) => productNameOf(products, transaction.productId) },
             { h: 'Type', r: (transaction) => <Badge s={transaction.type} /> },
             { h: 'Qty', k: 'qty' },
             { h: 'Date', k: 'date' },
@@ -263,7 +270,7 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-3">
         <LowStockAlerts products={products} />
         <RecentlyAddedProducts products={products} />
-        <RecentActivity transactions={transactions} />
+        <RecentActivity transactions={transactions} products={products} />
       </div>
     </div>
   )

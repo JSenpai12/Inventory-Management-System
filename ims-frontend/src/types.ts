@@ -6,20 +6,20 @@
 export type Product = {
   id: string
   name: string
-  category: string
+  categoryId: string // id of a row in the categories table, e.g. "C-01"
   sku: string // stock keeping unit: the product's unique code
   qty: number // how many are in stock right now
   min: number // minimum level: at or below this, the product counts as "Low Stock"
   price: number // selling price
   cost: number // what we pay the supplier
-  supplier: string
+  supplierId: string // id of a row in the suppliers table, e.g. "S-01"
   updated: string // date of the last change
 }
 
 // A stock transaction: stock coming in or going out.
 export type Txn = {
   id: string
-  product: string
+  productId: string // id of the product, e.g. "P-1001"
   type: 'Stock In' | 'Stock Out'
   qty: number
   date: string

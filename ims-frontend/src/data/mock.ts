@@ -3,7 +3,18 @@
 // WHAT TO DO: delete this file once the NestJS API returns real data (and remove its import in api.ts).
 import { Product, Row, Txn } from '../types'
 
-export const CATEGORIES = ['Electronics', 'Office Supplies', 'Packaging', 'Tools', 'Safety Gear']
+export const CATEGORIES = [
+  { id: 'C-01', name: 'Electronics' },
+  { id: 'C-02', name: 'Office Supplies' },
+  { id: 'C-03', name: 'Packaging' },
+  { id: 'C-04', name: 'Tools' },
+  { id: 'C-05', name: 'Safety Gear' },
+]
+
+// Ids of the suppliers listed in `tables.suppliers` below.
+const SUPPLIER = { northline: 'S-01', pacificPaper: 'S-02', safeWorks: 'S-03', boxCraft: 'S-04' }
+// Ids of the entries in CATEGORIES above.
+const CATEGORY = { electronics: 'C-01', office: 'C-02', packaging: 'C-03', tools: 'C-04', safety: 'C-05' }
 
 const MS_PER_DAY = 86_400_000
 
@@ -17,45 +28,45 @@ const daysAgo = (daysAgo: number) => new Date(Date.now() - daysAgo * MS_PER_DAY)
 const makeProduct = (
   index: number,
   name: string,
-  category: string,
+  categoryId: string,
   sku: string,
   qty: number,
   min: number,
   price: number,
-  supplier: string,
+  supplierId: string,
 ): Product => ({
   id: `P-${1001 + index}`,
   name,
-  category,
+  categoryId,
   sku,
   qty,
   min,
   price,
   // Cost is derived from the sell price at a fixed 62% margin.
   cost: Number((price * 0.62).toFixed(2)),
-  supplier,
+  supplierId,
   updated: daysAgo(index % 8),
 })
 
 export const products: Product[] = [
-  makeProduct(0, 'Wireless Barcode Scanner', 'Electronics', 'EL-1001', 24, 10, 89.5, 'Northline Distribution'),
-  makeProduct(1, 'Thermal Label Printer', 'Electronics', 'EL-1002', 6, 8, 249, 'Northline Distribution'),
-  makeProduct(2, 'A4 Copy Paper (Ream)', 'Office Supplies', 'OF-2001', 320, 100, 4.2, 'Pacific Paper Co.'),
-  makeProduct(3, 'Ballpoint Pens (Box of 50)', 'Office Supplies', 'OF-2002', 0, 20, 9.8, 'Pacific Paper Co.'),
-  makeProduct(4, 'Corrugated Box 12x12', 'Packaging', 'PK-3001', 1450, 500, 0.65, 'BoxCraft Packaging'),
-  makeProduct(5, 'Bubble Wrap Roll', 'Packaging', 'PK-3002', 18, 25, 22, 'BoxCraft Packaging'),
-  makeProduct(6, 'Cordless Drill 18V', 'Tools', 'TL-4001', 12, 5, 119, 'Northline Distribution'),
-  makeProduct(7, 'Torque Wrench Set', 'Tools', 'TL-4002', 0, 4, 74, 'Northline Distribution'),
-  makeProduct(8, 'Safety Helmet', 'Safety Gear', 'SF-5001', 85, 30, 14.5, 'SafeWorks Supply'),
-  makeProduct(9, 'Hi-Vis Vest', 'Safety Gear', 'SF-5002', 40, 50, 6.9, 'SafeWorks Supply'),
+  makeProduct(0, 'Wireless Barcode Scanner', CATEGORY.electronics, 'EL-1001', 24, 10, 89.5, SUPPLIER.northline),
+  makeProduct(1, 'Thermal Label Printer', CATEGORY.electronics, 'EL-1002', 6, 8, 249, SUPPLIER.northline),
+  makeProduct(2, 'A4 Copy Paper (Ream)', CATEGORY.office, 'OF-2001', 320, 100, 4.2, SUPPLIER.pacificPaper),
+  makeProduct(3, 'Ballpoint Pens (Box of 50)', CATEGORY.office, 'OF-2002', 0, 20, 9.8, SUPPLIER.pacificPaper),
+  makeProduct(4, 'Corrugated Box 12x12', CATEGORY.packaging, 'PK-3001', 1450, 500, 0.65, SUPPLIER.boxCraft),
+  makeProduct(5, 'Bubble Wrap Roll', CATEGORY.packaging, 'PK-3002', 18, 25, 22, SUPPLIER.boxCraft),
+  makeProduct(6, 'Cordless Drill 18V', CATEGORY.tools, 'TL-4001', 12, 5, 119, SUPPLIER.northline),
+  makeProduct(7, 'Torque Wrench Set', CATEGORY.tools, 'TL-4002', 0, 4, 74, SUPPLIER.northline),
+  makeProduct(8, 'Safety Helmet', CATEGORY.safety, 'SF-5001', 85, 30, 14.5, SUPPLIER.safeWorks),
+  makeProduct(9, 'Hi-Vis Vest', CATEGORY.safety, 'SF-5002', 40, 50, 6.9, SUPPLIER.safeWorks),
 ]
 
 export const txns: Txn[] = [
-  { id: 'T-9001', product: 'Wireless Barcode Scanner', type: 'Stock In', qty: 20, date: daysAgo(0), by: 'Amara Reyes', remarks: 'PO-7781' },
-  { id: 'T-9002', product: 'Ballpoint Pens (Box of 50)', type: 'Stock Out', qty: 35, date: daysAgo(1), by: 'Jon Park', remarks: 'Sale' },
-  { id: 'T-9003', product: 'Safety Helmet', type: 'Stock In', qty: 60, date: daysAgo(2), by: 'Amara Reyes', remarks: 'PO-7779' },
-  { id: 'T-9004', product: 'Bubble Wrap Roll', type: 'Stock Out', qty: 12, date: daysAgo(3), by: 'Lena Ortiz', remarks: 'Damaged' },
-  { id: 'T-9005', product: 'A4 Copy Paper (Ream)', type: 'Stock Out', qty: 80, date: daysAgo(4), by: 'Jon Park', remarks: 'Sale' },
+  { id: 'T-9001', productId: 'P-1001', type: 'Stock In', qty: 20, date: daysAgo(0), by: 'Amara Reyes', remarks: 'PO-7781' },
+  { id: 'T-9002', productId: 'P-1004', type: 'Stock Out', qty: 35, date: daysAgo(1), by: 'Jon Park', remarks: 'Sale' },
+  { id: 'T-9003', productId: 'P-1009', type: 'Stock In', qty: 60, date: daysAgo(2), by: 'Amara Reyes', remarks: 'PO-7779' },
+  { id: 'T-9004', productId: 'P-1006', type: 'Stock Out', qty: 12, date: daysAgo(3), by: 'Lena Ortiz', remarks: 'Damaged' },
+  { id: 'T-9005', productId: 'P-1003', type: 'Stock Out', qty: 80, date: daysAgo(4), by: 'Jon Park', remarks: 'Sale' },
 ]
 
 /**
@@ -77,10 +88,10 @@ export const tables: Record<string, Row[]> = {
   ],
 
   // Derived from CATEGORIES; the product count is read off the sample products.
-  categories: CATEGORIES.map((category, index) => ({
-    id: `C-0${index + 1}`,
-    name: category,
-    products: products.filter((product) => product.category === category).length,
+  categories: CATEGORIES.map((category) => ({
+    id: category.id,
+    name: category.name,
+    products: products.filter((product) => product.categoryId === category.id).length,
   })),
 
   orders: [
